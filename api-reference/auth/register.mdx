@@ -1,0 +1,89 @@
+---
+title: "POST /api/auth/register"
+description: "Create a new Scheduly account."
+---
+
+## Overview
+
+Registers a new user account with a unique username. On success the server returns the newly created user object — no authentication is required to call this endpoint.
+
+## Request
+
+### HTTP method and path
+
+`POST /api/auth/register`
+
+### Authentication
+
+None.
+
+### Request body
+
+<ParamField body="username" type="string" required placeholder="jhojanRop">
+  Unique username for the account. Maximum 50 characters.
+</ParamField>
+
+<ParamField body="password" type="string" required placeholder="••••••••">
+  Account password. Minimum 8 characters. Stored as a bcrypt hash — never returned in any response.
+</ParamField>
+
+<ParamField body="fullName" type="string" required placeholder="Jhojan Ropero">
+  Display name for the user. Maximum 100 characters.
+</ParamField>
+
+## Response
+
+HTTP `201 Created`
+
+<ResponseField name="id" type="string" required>
+  UUID that uniquely identifies the user.
+</ResponseField>
+
+<ResponseField name="username" type="string" required>
+  The username chosen during registration.
+</ResponseField>
+
+<ResponseField name="fullName" type="string" required>
+  The full name provided during registration.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string" required>
+  ISO 8601 timestamp of when the account was created.
+</ResponseField>
+
+<Note>
+  The `password` field is never included in any response from this API.
+</Note>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url https://api.scheduly.app/api/auth/register \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "username": "jhojanRop",
+    "password": "securepass123",
+    "fullName": "Jhojan Ropero"
+  }'
+```
+
+```json Response
+{
+  "id": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d",
+  "username": "jhojanRop",
+  "fullName": "Jhojan Ropero",
+  "createdAt": "2026-03-15T10:00:00.000Z"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | One or more fields failed validation. Check that `username` is at most 50 characters, `password` is at least 8 characters, and all three fields are present. |
+| `409 Conflict` | The requested `username` is already taken. Choose a different username and try again. |

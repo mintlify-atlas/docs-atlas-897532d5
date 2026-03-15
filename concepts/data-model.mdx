@@ -1,0 +1,195 @@
+---
+title: 'Data model'
+description: 'Reference for every Prisma model in the Scheduly API, their fields, and how they relate to each other.'
+keywords: ['data model', 'schema', 'prisma', 'database', 'entities', 'relationships']
+---
+
+Scheduly uses PostgreSQL with Prisma as the ORM. The schema has nine models organized around a single `User`.
+
+## Entity relationships
+
+All user-created data is scoped to a `User`. Deleting a user cascades to everything they own.
+
+```
+User
+├── Professor[]        (user owns professors)
+├── Subject[]
+│   └── Section[]
+│       ├── SectionDay[]   (maps section → Day)
+│       └── Professor?     (optional assignment)
+├── Rule[]
+└── SavedSchedule[]
+    └── ScheduleSection[]  (maps schedule → Section)
+
+Day                    (seeded, not user-created)
+```
+
+- A `User` owns `Professor`, `Subject`, `Rule`, and `SavedSchedule` records.
+- A `Subject` has many `Section` records. Each section belongs to exactly one subject.
+- A `Section` can optionally reference one `Professor`.
+- A `Section` maps to one or more `Day` records through `SectionDay`.
+- A `SavedSchedule` references one or more `Section` records through `ScheduleSection`.
+- `Day` is a static lookup table seeded with the 7 days of the week.
+
+## Models
+
+<AccordionGroup>
+  <Accordion title="User">
+    Represents an authenticated user. All user-created resources cascade-delete when the user is deleted.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `username` | `String` | Unique, max 50 characters |
+    | `password` | `String` | Stored as a hash |
+    | `fullName` | `String` | Max 100 characters, mapped to `full_name` |
+    | `createdAt` | `DateTime` | Timestamptz, default `now()` |
+
+    **Relations:** `professors`, `subjects`, `rules`, `savedSchedules`
+  </Accordion>
+
+  <Accordion title="Day">
+    A static lookup table seeded with the 7 days of the week. You do not create or modify `Day` records through the API.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `Int` | Primary key (1 = Monday … 7 = Sunday) |
+    | `name` | `String` | Day name, max 10 characters |
+
+    **Relations:** `sectionDays`
+  </Accordion>
+
+  <Accordion title="Professor">
+    A professor that can be assigned to sections. Professors belong to the user who created them.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `fullName` | `String` | Max 100 characters, mapped to `full_name` |
+    | `userId` | `String?` | Foreign key → `User.id`, nullable, cascade on delete |
+
+    **Relations:** `user`, `sections`
+  </Accordion>
+
+  <Accordion title="Subject">
+    An academic subject (course). Each subject belongs to a user and contains one or more sections.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `name` | `String` | Max 100 characters |
+    | `userId` | `String` | Foreign key → `User.id`, cascade on delete |
+
+    **Relations:** `user`, `sections`
+  </Accordion>
+
+  <Accordion title="Section">
+    A specific class offering — a subject at a fixed time, optionally taught by a professor. A subject can have multiple sections (e.g., different professors or times).
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `startTime` | `DateTime` | Timetz column, time-of-day only |
+    | `endTime` | `DateTime` | Timetz column, time-of-day only |
+    | `subjectId` | `String` | Foreign key → `Subject.id`, cascade on delete |
+    | `professorId` | `String?` | Foreign key → `Professor.id`, nullable, set null on delete |
+
+    **Relations:** `subject`, `professor`, `sectionDays`, `schedulesSections`
+
+    <Info>
+      `startTime` and `endTime` are stored as `Timetz` (time with timezone). The API serializes them as `HH:MM` strings in responses.
+    </Info>
+  </Accordion>
+
+  <Accordion title="SectionDay">
+    A join table connecting a `Section` to a `Day`. A section can meet on multiple days; each meeting is a separate `SectionDay` row.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `sectionId` | `String` | Foreign key → `Section.id`, cascade on delete |
+    | `dayId` | `Int` | Foreign key → `Day.id` |
+
+    **Relations:** `section`, `day`
+  </Accordion>
+
+  <Accordion title="Rule">
+    A user-defined optimization rule. Rules are applied by the scheduling engine when generating schedules.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `type` | `String` | One of the 11 `RuleType` enum values, max 50 characters |
+    | `priorityOrder` | `Int` | Lower = higher priority = higher scoring weight |
+    | `parameters` | `Json?` | Nullable; structure depends on rule type |
+    | `userId` | `String` | Foreign key → `User.id`, cascade on delete |
+
+    **Relations:** `user`
+
+    See [Optimization rules](/concepts/rules) for the full list of types and their parameter schemas.
+  </Accordion>
+
+  <Accordion title="SavedSchedule">
+    A named schedule saved by the user after generation. It holds references to the chosen sections.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `id` | `String` (UUID) | Primary key, auto-generated |
+    | `name` | `String` | Max 50 characters |
+    | `createdAt` | `DateTime` | Timestamptz, default `now()` |
+    | `userId` | `String` | Foreign key → `User.id`, cascade on delete |
+
+    **Relations:** `user`, `schedulesSections`
+  </Accordion>
+
+  <Accordion title="ScheduleSection">
+    A join table connecting a `SavedSchedule` to a `Section`. The composite primary key is `(scheduleId, sectionId)`.
+
+    | Field | Type | Notes |
+    |-------|------|-------|
+    | `scheduleId` | `String` | Foreign key → `SavedSchedule.id`, cascade on delete |
+    | `sectionId` | `String` | Foreign key → `Section.id`, cascade on delete |
+
+    **Relations:** `savedSchedule`, `section`
+  </Accordion>
+</AccordionGroup>
+
+## Section with populated relations
+
+When the scheduling engine returns a result, each section is fully populated with its subject, professor, and scheduled days. This is the shape used internally and reflected in the `ScheduleResultDto`:
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "startTime": "1970-01-01T08:00:00.000Z",
+  "endTime": "1970-01-01T10:00:00.000Z",
+  "subjectId": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90",
+  "professorId": "e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9012",
+  "subject": {
+    "id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90",
+    "name": "Calculus I",
+    "userId": "f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f901234"
+  },
+  "professor": {
+    "id": "e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9012",
+    "fullName": "Dr. Ana Torres",
+    "userId": "f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f901234"
+  },
+  "sectionDays": [
+    {
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "sectionId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "dayId": 1,
+      "day": { "id": 1, "name": "Monday" }
+    },
+    {
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "sectionId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "dayId": 3,
+      "day": { "id": 3, "name": "Wednesday" }
+    }
+  ]
+}
+```
+
+The API endpoint `POST /api/scheduling/generate` serializes this into the compact `ScheduleResultDto` format where `startTime` and `endTime` become `HH:MM` strings and `sectionDays` becomes a flat `days` array of day names.

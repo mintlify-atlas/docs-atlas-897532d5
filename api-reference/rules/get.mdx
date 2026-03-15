@@ -1,0 +1,88 @@
+---
+title: "GET /api/rules/:id"
+description: "Retrieve a single rule by its UUID."
+---
+
+## Overview
+
+Returns a single rule identified by its UUID. The rule must belong to the authenticated user. If the rule does not exist or belongs to another user, the endpoint returns `404 Not Found`.
+
+## Request
+
+### HTTP method and path
+
+`GET /api/rules/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a">
+  UUID of the rule to retrieve.
+</ParamField>
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="id" type="string" required>
+  UUID that uniquely identifies the rule.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  Identifier for the rule type (e.g., `NO_GAPS`, `LUNCH_BREAK_PROTECTED`).
+</ResponseField>
+
+<ResponseField name="priorityOrder" type="number" required>
+  Evaluation order. Lower values are applied first by the scheduling engine.
+</ResponseField>
+
+<ResponseField name="parameters" type="object | null" required>
+  Rule-specific configuration, or `null` if the rule requires no parameters.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this rule.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request GET \
+  --url https://api.scheduly.app/api/rules/d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+{
+  "id": "d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
+  "type": "LUNCH_BREAK_PROTECTED",
+  "priorityOrder": 1,
+  "parameters": {
+    "type": "timeRange",
+    "value": { "start": "12:00", "end": "14:00" }
+  },
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No rule with the given ID exists for the authenticated user. |

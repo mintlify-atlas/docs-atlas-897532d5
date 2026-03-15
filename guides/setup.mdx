@@ -1,0 +1,126 @@
+---
+title: "Setup & Installation"
+description: "Install and configure Scheduly API for local development or production deployment."
+keywords: ["setup", "installation", "environment", "database", "configuration", "getting started"]
+---
+
+This guide covers a full production-ready installation of Scheduly API, from cloning the repository to a running server with a seeded database.
+
+## Prerequisites
+
+- **Node.js 20.x** — the runtime for NestJS
+- **PostgreSQL 14 or later** — the database backend
+- **npm** — bundled with Node.js, used to install dependencies
+
+## Environment variables
+
+Before starting the server, create a `.env` file in the project root. Use the table below as a reference for every supported variable.
+
+| Variable | Description | Example |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string in Prisma format | `postgresql://postgres:secret@localhost:5432/scheduly_db?schema=public` |
+| `JWT_SECRET` | Secret used to sign and verify JWT access tokens — use a long random string | `a8f3k2...` |
+| `NODE_ENV` | Runtime environment — affects logging and error detail | `development` or `production` |
+| `PORT` | Port the HTTP server listens on | `3000` |
+| `CORS_ORIGIN` | Allowed origin for CORS requests — set to your frontend URL in production | `http://localhost:5173` |
+
+## Installation steps
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/JhojanRop/scheduly-api.git
+    cd scheduly-api
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Create your .env file">
+    Copy the provided example and fill in your values:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit `.env` with your PostgreSQL credentials and a strong JWT secret:
+
+    ```bash
+    DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/scheduly_db?schema=public"
+    JWT_SECRET="replace-with-a-long-random-secret-at-least-32-chars"
+    NODE_ENV="development"
+    PORT=3000
+    CORS_ORIGIN="http://localhost:5173"
+    ```
+
+    The database `scheduly_db` does not need to exist yet — Prisma will create it during the migration step.
+  </Step>
+
+  <Step title="Run database migrations">
+    Apply the Prisma schema to your PostgreSQL instance:
+
+    ```bash
+    npx prisma migrate dev
+    ```
+
+    This creates all tables and relationships defined in `prisma/schema.prisma`.
+  </Step>
+
+  <Step title="Seed the database">
+    Populate the `days` lookup table with the seven days of the week:
+
+    ```bash
+    npx prisma db seed
+    ```
+
+    This inserts rows for Monday (id: 1) through Sunday (id: 7). The scheduling engine and section creation both rely on these rows existing.
+  </Step>
+
+  <Step title="Start the server">
+    <Tabs>
+      <Tab title="Development">
+        ```bash
+        npm run start:dev
+        ```
+
+        The server starts with hot-reload enabled. Changes to source files are reflected immediately without restarting.
+      </Tab>
+      <Tab title="Production">
+        ```bash
+        npm run build && npm run start:prod
+        ```
+
+        Compiles TypeScript to JavaScript in `dist/` and starts the compiled output. Set `NODE_ENV=production` in your environment before running.
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+Once the server is running, the API is available at `http://localhost:3000/api`.
+
+<Tip>
+  Open `http://localhost:3000/docs` in your browser to explore the full Swagger UI. Every endpoint is documented with request schemas, response shapes, and an interactive playground where you can authorize with your JWT token and send live requests without leaving the browser.
+</Tip>
+
+## Verify the installation
+
+Send a request to the health check endpoint to confirm the server is up:
+
+```bash
+curl http://localhost:3000/api/auth/register \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "testpass123", "fullName": "Test User"}'
+```
+
+A `201 Created` response with a user object confirms the server and database are connected correctly.
+
+## Next steps
+
+- Follow the [Quickstart](/quickstart) to create your first subjects, sections, and rules.
+- Read the [Authentication](/authentication) guide to understand how JWT tokens and refresh cookies work.
+- Explore the [Scheduling engine](/concepts/scheduling-engine) concept page to understand how the engine scores and ranks combinations.

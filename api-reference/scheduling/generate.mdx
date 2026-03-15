@@ -1,0 +1,407 @@
+---
+title: "POST /api/scheduling/generate"
+description: "Generate ranked, optimized schedule combinations for a set of subjects."
+---
+
+## Overview
+
+This is the core endpoint of the Scheduly API. You provide a list of subject IDs, and the scheduling engine returns up to three ranked schedule combinations — each one a conflict-free selection of one section per subject, scored against your active rules.
+
+### How the engine works
+
+1. **Section retrieval** — The engine fetches all sections that belong to the requested subjects and are owned by the authenticated user.
+2. **Combination generation** — It computes every valid combination of sections (one section per subject) that has no time conflicts.
+3. **Rule scoring** — Each conflict-free combination is scored using your rules in `priorityOrder` order. Rules with lower priority numbers contribute more to the final score.
+4. **Ranking** — Combinations are ranked by score from highest to lowest. The top three results are returned.
+
+<Info>
+  Rules are loaded automatically from your account. You do not need to pass them in the request. Manage your rules via the [Rules endpoints](/api-reference/rules/create).
+</Info>
+
+<Warning>
+  The engine throws `400 Bad Request` if no sections exist for any of the requested subjects, or if no valid (conflict-free) combinations can be formed.
+</Warning>
+
+## Request
+
+### HTTP method and path
+
+`POST /api/scheduling/generate`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Request body
+
+<ParamField body="subjectIds" type="string[]" required>
+  An array of subject UUIDs to include in the generated schedules. Must contain at least one element. All UUIDs must be valid v4 UUIDs and must belong to subjects owned by the authenticated user.
+</ParamField>
+
+## Response
+
+HTTP `200 OK`
+
+An array of up to three schedule results, ordered from highest to lowest score.
+
+<ResponseField name="[]" type="object[]" required>
+  <Expandable title="schedule result properties" defaultOpen>
+    <ResponseField name="rank" type="number" required>
+      Position in the ranking. `1` is the best-scoring schedule.
+    </ResponseField>
+    <ResponseField name="score" type="number" required>
+      Numerical score assigned by the rule engine. Higher is better. Rounded to two decimal places.
+    </ResponseField>
+    <ResponseField name="sections" type="object[]" required>
+      One entry per subject — the specific section selected for that subject in this schedule combination.
+      <Expandable title="section properties">
+        <ResponseField name="sectionId" type="string" required>
+          UUID of the section. Use this value when saving the schedule via `POST /api/saved-schedules`.
+        </ResponseField>
+        <ResponseField name="subject" type="string" required>
+          Display name of the subject (e.g., `"Calculus"`).
+        </ResponseField>
+        <ResponseField name="professor" type="string | null" required>
+          Full name of the assigned professor, or `null` if no professor is assigned to the section.
+        </ResponseField>
+        <ResponseField name="startTime" type="string" required>
+          Section start time in `HH:MM` format (24-hour).
+        </ResponseField>
+        <ResponseField name="endTime" type="string" required>
+          Section end time in `HH:MM` format (24-hour).
+        </ResponseField>
+        <ResponseField name="days" type="string[]" required>
+          Days of the week the section meets (e.g., `["Monday", "Wednesday"]`).
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs>
+  <Tab title="No rules (default ordering)">
+    When you have no rules configured, the engine still returns valid conflict-free combinations, but they are not scored against any preference — results are ordered by an internal default.
+
+    <CodeGroup>
+
+    ```bash curl
+    curl --request POST \
+      --url https://api.scheduly.app/api/scheduling/generate \
+      --header 'Authorization: Bearer <accessToken>' \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "subjectIds": [
+          "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+          "c2d3e4f5-6a7b-8c9d-0e1f-2a3b4c5d6e7f"
+        ]
+      }'
+    ```
+
+    ```json Response
+    [
+      {
+        "rank": 1,
+        "score": 50.00,
+        "sections": [
+          {
+            "sectionId": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+            "subject": "Calculus",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["Monday", "Wednesday"]
+          },
+          {
+            "sectionId": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+            "subject": "Physics",
+            "professor": "Dr. Johnson",
+            "startTime": "10:30",
+            "endTime": "12:00",
+            "days": ["Tuesday", "Thursday"]
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "score": 50.00,
+        "sections": [
+          {
+            "sectionId": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+            "subject": "Calculus",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["Monday", "Wednesday"]
+          },
+          {
+            "sectionId": "c3d4e5f6-a7b8-9c0d-1e2f-a3b4c5d6e7f8",
+            "subject": "Physics",
+            "professor": "Dr. Lee",
+            "startTime": "14:00",
+            "endTime": "15:30",
+            "days": ["Monday", "Wednesday"]
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "score": 50.00,
+        "sections": [
+          {
+            "sectionId": "d4e5f6a7-b8c9-0d1e-2f3a-b4c5d6e7f8a9",
+            "subject": "Calculus",
+            "professor": "Dr. Rivera",
+            "startTime": "16:00",
+            "endTime": "18:00",
+            "days": ["Tuesday", "Thursday"]
+          },
+          {
+            "sectionId": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+            "subject": "Physics",
+            "professor": "Dr. Johnson",
+            "startTime": "10:30",
+            "endTime": "12:00",
+            "days": ["Tuesday", "Thursday"]
+          }
+        ]
+      }
+    ]
+    ```
+
+    </CodeGroup>
+  </Tab>
+  <Tab title="With NO_GAPS rule">
+    Adding a `NO_GAPS` rule causes the engine to favor combinations where back-to-back classes leave no large idle gaps in the day.
+
+    <CodeGroup>
+
+    ```bash curl
+    curl --request POST \
+      --url https://api.scheduly.app/api/scheduling/generate \
+      --header 'Authorization: Bearer <accessToken>' \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "subjectIds": [
+          "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+          "c2d3e4f5-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
+          "d3e4f5a6-7b8c-9d0e-1f2a-3b4c5d6e7f8a"
+        ]
+      }'
+    ```
+
+    ```json Response
+    [
+      {
+        "rank": 1,
+        "score": 87.50,
+        "sections": [
+          {
+            "sectionId": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+            "subject": "Calculus",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["Monday", "Wednesday", "Friday"]
+          },
+          {
+            "sectionId": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+            "subject": "Physics",
+            "professor": "Dr. Johnson",
+            "startTime": "10:00",
+            "endTime": "11:30",
+            "days": ["Monday", "Wednesday", "Friday"]
+          },
+          {
+            "sectionId": "e5f6a7b8-c9d0-1e2f-3a4b-c5d6e7f8a9b0",
+            "subject": "Linear Algebra",
+            "professor": "Dr. Patel",
+            "startTime": "11:30",
+            "endTime": "13:00",
+            "days": ["Monday", "Wednesday", "Friday"]
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "score": 72.00,
+        "sections": [
+          {
+            "sectionId": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+            "subject": "Calculus",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["Monday", "Wednesday", "Friday"]
+          },
+          {
+            "sectionId": "c3d4e5f6-a7b8-9c0d-1e2f-a3b4c5d6e7f8",
+            "subject": "Physics",
+            "professor": "Dr. Lee",
+            "startTime": "10:00",
+            "endTime": "11:30",
+            "days": ["Tuesday", "Thursday"]
+          },
+          {
+            "sectionId": "f6a7b8c9-d0e1-2f3a-4b5c-d6e7f8a9b0c1",
+            "subject": "Linear Algebra",
+            "professor": "Dr. Patel",
+            "startTime": "14:00",
+            "endTime": "15:30",
+            "days": ["Monday", "Wednesday"]
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "score": 58.25,
+        "sections": [
+          {
+            "sectionId": "d4e5f6a7-b8c9-0d1e-2f3a-b4c5d6e7f8a9",
+            "subject": "Calculus",
+            "professor": "Dr. Rivera",
+            "startTime": "16:00",
+            "endTime": "18:00",
+            "days": ["Tuesday", "Thursday"]
+          },
+          {
+            "sectionId": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+            "subject": "Physics",
+            "professor": "Dr. Johnson",
+            "startTime": "10:30",
+            "endTime": "12:00",
+            "days": ["Tuesday", "Thursday"]
+          },
+          {
+            "sectionId": "e5f6a7b8-c9d0-1e2f-3a4b-c5d6e7f8a9b0",
+            "subject": "Linear Algebra",
+            "professor": "Dr. Patel",
+            "startTime": "11:30",
+            "endTime": "13:00",
+            "days": ["Monday", "Wednesday", "Friday"]
+          }
+        ]
+      }
+    ]
+    ```
+
+    </CodeGroup>
+  </Tab>
+  <Tab title="With LUNCH_BREAK_PROTECTED rule">
+    A `LUNCH_BREAK_PROTECTED` rule with a `timeRange` parameter causes the engine to penalize combinations that schedule classes during the protected window.
+
+    <CodeGroup>
+
+    ```bash curl
+    curl --request POST \
+      --url https://api.scheduly.app/api/scheduling/generate \
+      --header 'Authorization: Bearer <accessToken>' \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "subjectIds": [
+          "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+          "c2d3e4f5-6a7b-8c9d-0e1f-2a3b4c5d6e7f"
+        ]
+      }'
+    ```
+
+    ```json Response
+    [
+      {
+        "rank": 1,
+        "score": 95.00,
+        "sections": [
+          {
+            "sectionId": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+            "subject": "Calculus",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["Monday", "Wednesday"]
+          },
+          {
+            "sectionId": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+            "subject": "Physics",
+            "professor": "Dr. Johnson",
+            "startTime": "15:00",
+            "endTime": "16:30",
+            "days": ["Tuesday", "Thursday"]
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "score": 60.00,
+        "sections": [
+          {
+            "sectionId": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+            "subject": "Calculus",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["Monday", "Wednesday"]
+          },
+          {
+            "sectionId": "c3d4e5f6-a7b8-9c0d-1e2f-a3b4c5d6e7f8",
+            "subject": "Physics",
+            "professor": "Dr. Lee",
+            "startTime": "12:00",
+            "endTime": "13:30",
+            "days": ["Monday", "Wednesday"]
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "score": 45.00,
+        "sections": [
+          {
+            "sectionId": "d4e5f6a7-b8c9-0d1e-2f3a-b4c5d6e7f8a9",
+            "subject": "Calculus",
+            "professor": "Dr. Rivera",
+            "startTime": "12:30",
+            "endTime": "14:00",
+            "days": ["Tuesday", "Thursday"]
+          },
+          {
+            "sectionId": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+            "subject": "Physics",
+            "professor": "Dr. Johnson",
+            "startTime": "15:00",
+            "endTime": "16:30",
+            "days": ["Tuesday", "Thursday"]
+          }
+        ]
+      }
+    ]
+    ```
+
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+## Saving a result
+
+Once you have chosen a schedule from the results, pass the `sectionId` values from the `sections` array to `POST /api/saved-schedules` to persist it.
+
+```json
+{
+  "name": "My ideal schedule",
+  "sectionIds": [
+    "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+    "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7"
+  ]
+}
+```
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | `subjectIds` is empty, contains invalid UUIDs, no sections were found for one or more subjects, or no valid conflict-free combinations exist. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |

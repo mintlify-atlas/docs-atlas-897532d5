@@ -1,0 +1,69 @@
+---
+title: "POST /api/auth/login"
+description: "Authenticate with a username and password to receive an access token."
+---
+
+## Overview
+
+Validates a username and password combination. On success the server returns a short-lived JWT access token in the response body and sets a long-lived `refreshToken` cookie that you can use to obtain new access tokens without re-entering credentials.
+
+## Request
+
+### HTTP method and path
+
+`POST /api/auth/login`
+
+### Authentication
+
+None.
+
+### Request body
+
+<ParamField body="username" type="string" required placeholder="jhojanRop">
+  The username of the account you want to authenticate as.
+</ParamField>
+
+<ParamField body="password" type="string" required placeholder="••••••••">
+  The account password.
+</ParamField>
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="accessToken" type="string" required>
+  A signed JWT. Include this value in the `Authorization: Bearer <token>` header for all protected endpoints. Expires after **15 minutes**.
+</ResponseField>
+
+<Info>
+  The response also sets an **HttpOnly** `refreshToken` cookie that expires after 7 days. Because it is HttpOnly, JavaScript running in the browser cannot read it — the browser sends it automatically with requests to `/api/auth/refresh` and `/api/auth/logout`.
+</Info>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url https://api.scheduly.app/api/auth/login \
+  --header 'Content-Type: application/json' \
+  --cookie-jar cookies.txt \
+  --data '{
+    "username": "jhojanRop",
+    "password": "securepass123"
+  }'
+```
+
+```json Response
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhM2Y4YzJkMS00YjVlLTRmNmEtOGM5ZC0wZTFmMmEzYjRjNWQiLCJ1c2VybmFtZSI6Impob2phblJvcCIsImlhdCI6MTc0MjAzMjAwMCwiZXhwIjoxNzQyMDMyOTAwfQ.signature"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The username does not exist or the password is incorrect. The error message is intentionally generic to prevent user enumeration. |

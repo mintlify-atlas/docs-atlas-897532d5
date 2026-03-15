@@ -1,0 +1,177 @@
+---
+title: "POST /api/rules"
+description: "Create a new scheduling rule for the authenticated user."
+---
+
+## Overview
+
+Creates a rule that the scheduling engine applies when generating optimized schedules. Rules are evaluated in ascending `priorityOrder`, so a rule with order `1` is applied before a rule with order `2`.
+
+Each rule has a `type` that identifies which constraint it enforces. Some rule types require additional `parameters` to configure their behavior — for example, a time-range rule needs start and end times, and a professor-avoidance rule needs a professor ID.
+
+<Info>
+  See [Rules](/concepts/rules) for the full catalog of supported rule types and their parameter shapes.
+</Info>
+
+## Request
+
+### HTTP method and path
+
+`POST /api/rules`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Request body
+
+<ParamField body="type" type="string" required placeholder="NO_GAPS">
+  Identifier for the rule type. Maximum 50 characters. Must be a valid type from the rule catalog (e.g., `NO_GAPS`, `LUNCH_BREAK_PROTECTED`, `AVOID_PROFESSOR`).
+</ParamField>
+
+<ParamField body="priorityOrder" type="number" required placeholder="1">
+  Evaluation order for this rule. Minimum value is `1`. Lower numbers are evaluated first. Use distinct values to establish a clear priority ranking.
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  Optional configuration for rules that require additional input. The shape depends on the rule type.
+
+  <Expandable title="parameter shapes">
+    <ResponseField name="type" type="string" required>
+      Discriminator for the parameter kind. One of: `number`, `timeRange`, `daySelect`, `professorSelect`.
+    </ResponseField>
+    <ResponseField name="value" type="number | object | string">
+      The parameter value. Shape depends on `type`:
+      - `number` — an integer (e.g., `2`)
+      - `timeRange` — an object `{ "start": "HH:MM", "end": "HH:MM" }`
+      - `daySelect` — an integer day ID
+      - `professorSelect` — a UUID string
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+HTTP `201 Created`
+
+<ResponseField name="id" type="string" required>
+  UUID that uniquely identifies the rule.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  The rule type as provided in the request.
+</ResponseField>
+
+<ResponseField name="priorityOrder" type="number" required>
+  The evaluation priority as provided in the request.
+</ResponseField>
+
+<ResponseField name="parameters" type="object | null" required>
+  The rule parameters as provided, or `null` if none were supplied.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this rule.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash Simple rule (no parameters)
+curl --request POST \
+  --url https://api.scheduly.app/api/rules \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "type": "NO_GAPS",
+    "priorityOrder": 1
+  }'
+```
+
+```json Response
+{
+  "id": "d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
+  "type": "NO_GAPS",
+  "priorityOrder": 1,
+  "parameters": null,
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```bash Rule with timeRange parameters
+curl --request POST \
+  --url https://api.scheduly.app/api/rules \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "type": "LUNCH_BREAK_PROTECTED",
+    "priorityOrder": 1,
+    "parameters": {
+      "type": "timeRange",
+      "value": { "start": "12:00", "end": "14:00" }
+    }
+  }'
+```
+
+```json Response
+{
+  "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+  "type": "LUNCH_BREAK_PROTECTED",
+  "priorityOrder": 1,
+  "parameters": {
+    "type": "timeRange",
+    "value": { "start": "12:00", "end": "14:00" }
+  },
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```bash Rule with professorSelect parameters
+curl --request POST \
+  --url https://api.scheduly.app/api/rules \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "type": "AVOID_PROFESSOR",
+    "priorityOrder": 2,
+    "parameters": {
+      "type": "professorSelect",
+      "value": "f7a8b9c0-1d2e-3f4a-5b6c-7d8e9f0a1b2c"
+    }
+  }'
+```
+
+```json Response
+{
+  "id": "f6a7b8c9-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
+  "type": "AVOID_PROFESSOR",
+  "priorityOrder": 2,
+  "parameters": {
+    "type": "professorSelect",
+    "value": "f7a8b9c0-1d2e-3f4a-5b6c-7d8e9f0a1b2c"
+  },
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | A required field is missing, `priorityOrder` is less than `1`, or `type` exceeds 50 characters. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |

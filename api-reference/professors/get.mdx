@@ -1,0 +1,71 @@
+---
+title: "GET /api/professors/:id"
+description: "Retrieve a single professor by their ID."
+---
+
+## Overview
+
+Returns a single professor by UUID. The professor must belong to the authenticated user — attempting to access a professor owned by another user returns `404`, the same as requesting a professor that does not exist.
+
+## Request
+
+### HTTP method and path
+
+`GET /api/professors/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b">
+  UUID of the professor to retrieve.
+</ParamField>
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="id" type="string" required>
+  UUID that uniquely identifies the professor.
+</ResponseField>
+
+<ResponseField name="fullName" type="string" required>
+  Full name of the professor.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this professor.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request GET \
+  --url https://api.scheduly.app/api/professors/e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+{
+  "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+  "fullName": "Juan Pérez",
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No professor with the given ID exists for the authenticated user. This is returned both when the ID does not exist and when it belongs to a different user. |

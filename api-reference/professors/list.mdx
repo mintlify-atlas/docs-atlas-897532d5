@@ -1,0 +1,79 @@
+---
+title: "GET /api/professors"
+description: "Retrieve all professors belonging to the authenticated user."
+---
+
+## Overview
+
+Returns every professor that was created by the authenticated user. Professors from other users are never included in the response.
+
+## Request
+
+### HTTP method and path
+
+`GET /api/professors`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `200 OK`
+
+An array of professor objects. Returns an empty array `[]` when the user has no professors.
+
+<ResponseField name="[]" type="object[]" required>
+  <Expandable title="professor properties">
+    <ResponseField name="id" type="string" required>
+      UUID that uniquely identifies the professor.
+    </ResponseField>
+    <ResponseField name="fullName" type="string" required>
+      Full name of the professor.
+    </ResponseField>
+    <ResponseField name="userId" type="string" required>
+      UUID of the user who owns this professor.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request GET \
+  --url https://api.scheduly.app/api/professors \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+[
+  {
+    "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+    "fullName": "Juan Pérez",
+    "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+  },
+  {
+    "id": "f6a7b8c9-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
+    "fullName": "María García",
+    "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+  }
+]
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |

@@ -1,0 +1,327 @@
+---
+title: "Generating a schedule"
+description: "End-to-end walkthrough for generating an optimized academic schedule using the Scheduly API."
+keywords: ["generate", "schedule", "optimization", "backtracking", "scoring", "workflow"]
+---
+
+This guide walks you through the complete workflow to produce an optimized schedule: creating subjects, professors, and sections, configuring rules, calling the generation endpoint, reading the results, and saving the schedule you want.
+
+<Info>
+  All requests require a valid Bearer token. Obtain one via `POST /api/auth/login` and pass it in every request as `Authorization: Bearer <token>`. The examples below assume the token is stored in a `$TOKEN` shell variable.
+</Info>
+
+## Prerequisites
+
+Before calling the generation endpoint you need:
+
+- At least one **subject** created under your account
+- At least one **section** per subject, each with a start time, end time, and one or more days
+- Optionally, one or more **rules** to guide the scoring
+
+The steps below show how to set everything up from scratch.
+
+## Step-by-step workflow
+
+<Steps>
+  <Step title="Create your subjects">
+    A subject represents a course you want in your schedule. Create one for each course.
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/subjects \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "Algorithms"}'
+    ```
+
+    ```json response
+    {
+      "id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Algorithms",
+      "userId": "user-uuid"
+    }
+    ```
+    </CodeGroup>
+
+    Repeat for each subject. Note each `id` — you will pass them to the generation endpoint.
+
+    To list existing subjects at any time:
+
+    <CodeGroup>
+    ```bash curl
+    curl http://localhost:3000/api/subjects \
+      -H "Authorization: Bearer $TOKEN"
+    ```
+
+    ```json response
+    [
+      {
+        "id": "a1b2c3d4-0001-0000-0000-000000000001",
+        "name": "Algorithms",
+        "userId": "user-uuid"
+      },
+      {
+        "id": "a1b2c3d4-0002-0000-0000-000000000002",
+        "name": "Databases",
+        "userId": "user-uuid"
+      }
+    ]
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create a professor (optional)">
+    Professors are optional but useful — they let you use the `AVOID_PROFESSOR` rule to exclude specific professors from your schedule.
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/professors \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"fullName": "Dr. Smith"}'
+    ```
+
+    ```json response
+    {
+      "id": "prof-uuid-0001-0000-0000-000000000001",
+      "fullName": "Dr. Smith",
+      "userId": "user-uuid"
+    }
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create sections for each subject">
+    A section represents a specific time slot and set of days when a subject is offered. Each subject needs at least one section. Create multiple sections per subject to give the engine options to choose from.
+
+    Section `dayIds` follow the seeded `Day` table: 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday, 7 = Sunday.
+
+    <CodeGroup>
+    ```bash curl
+    # Morning section: Mon/Wed/Fri 08:00–10:00
+    curl -X POST http://localhost:3000/api/sections \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "subjectId": "a1b2c3d4-0001-0000-0000-000000000001",
+        "professorId": "prof-uuid-0001-0000-0000-000000000001",
+        "startTime": "08:00",
+        "endTime": "10:00",
+        "dayIds": [1, 3, 5]
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "sec-uuid-0001-0000-0000-000000000001",
+      "startTime": "08:00",
+      "endTime": "10:00",
+      "subjectId": "a1b2c3d4-0001-0000-0000-000000000001",
+      "professorId": "prof-uuid-0001-0000-0000-000000000001",
+      "sectionDays": [
+        { "day": { "id": 1, "name": "monday" } },
+        { "day": { "id": 3, "name": "wednesday" } },
+        { "day": { "id": 5, "name": "friday" } }
+      ]
+    }
+    ```
+    </CodeGroup>
+
+    Create an alternative section for the same subject at a different time:
+
+    ```bash
+    # Afternoon section: Tue/Thu 14:00–16:00
+    curl -X POST http://localhost:3000/api/sections \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "subjectId": "a1b2c3d4-0001-0000-0000-000000000001",
+        "startTime": "14:00",
+        "endTime": "16:00",
+        "dayIds": [2, 4]
+      }'
+    ```
+  </Step>
+
+  <Step title="Configure optimization rules">
+    Rules tell the engine what you prefer. They are applied in two ways: pruning (hard constraints that eliminate sections) and scoring (soft constraints that rank combinations). See [Managing optimization rules](/guides/manage-rules) for a full explanation.
+
+    Create a few rules before generating:
+
+    ```bash
+    # Prefer morning classes (highest priority)
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"type": "PREFER_MORNING", "priorityOrder": 1}'
+
+    # Avoid gaps between classes
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"type": "NO_GAPS", "priorityOrder": 2}'
+
+    # Compact schedule into fewer days
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"type": "COMPACT_DAYS", "priorityOrder": 3}'
+    ```
+  </Step>
+
+  <Step title="Generate the schedule">
+    Call `POST /api/scheduling/generate` with an array of subject IDs. The engine fetches all sections for those subjects, applies your rules, and returns the top three conflict-free combinations ranked by score.
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/scheduling/generate \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "subjectIds": [
+          "a1b2c3d4-0001-0000-0000-000000000001",
+          "a1b2c3d4-0002-0000-0000-000000000002"
+        ]
+      }'
+    ```
+
+    ```json response
+    [
+      {
+        "rank": 1,
+        "score": 187.5,
+        "sections": [
+          {
+            "sectionId": "sec-uuid-0001-0000-0000-000000000001",
+            "subject": "Algorithms",
+            "professor": "Dr. Smith",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": ["monday", "wednesday", "friday"]
+          },
+          {
+            "sectionId": "sec-uuid-0002-0000-0000-000000000001",
+            "subject": "Databases",
+            "professor": "Dr. Reyes",
+            "startTime": "10:00",
+            "endTime": "12:00",
+            "days": ["monday", "wednesday"]
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "score": 142.0,
+        "sections": [
+          {
+            "sectionId": "sec-uuid-0001-0000-0000-000000000002",
+            "subject": "Algorithms",
+            "professor": "Dr. Smith",
+            "startTime": "14:00",
+            "endTime": "16:00",
+            "days": ["tuesday", "thursday"]
+          },
+          {
+            "sectionId": "sec-uuid-0002-0000-0000-000000000001",
+            "subject": "Databases",
+            "professor": "Dr. Reyes",
+            "startTime": "10:00",
+            "endTime": "12:00",
+            "days": ["monday", "wednesday"]
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "score": 98.33,
+        "sections": [
+          {
+            "sectionId": "sec-uuid-0001-0000-0000-000000000002",
+            "subject": "Algorithms",
+            "professor": "Dr. Smith",
+            "startTime": "14:00",
+            "endTime": "16:00",
+            "days": ["tuesday", "thursday"]
+          },
+          {
+            "sectionId": "sec-uuid-0002-0000-0000-000000000002",
+            "subject": "Databases",
+            "professor": null,
+            "startTime": "16:00",
+            "endTime": "18:00",
+            "days": ["tuesday", "thursday"]
+          }
+        ]
+      }
+    ]
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Read the results">
+    Each item in the response represents one complete, conflict-free schedule:
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `rank` | `number` | Position from best (1) to worst (3) |
+    | `score` | `number` | Total weighted score, rounded to 2 decimal places. Higher is better. |
+    | `sections` | `array` | One entry per subject in the schedule |
+    | `sections[].sectionId` | `string` | UUID of the section |
+    | `sections[].subject` | `string` | Subject name |
+    | `sections[].professor` | `string \| null` | Professor full name, or `null` if no professor is assigned |
+    | `sections[].startTime` | `string` | Class start time in `HH:MM` format |
+    | `sections[].endTime` | `string` | Class end time in `HH:MM` format |
+    | `sections[].days` | `string[]` | Day names the class meets (e.g. `["monday", "wednesday"]`) |
+
+    <Info>
+      The score is the sum of weighted rule contributions across all sections in the combination. It is rounded to 2 decimal places. A higher score means the combination satisfies more of your rules at higher priorities. Scores are not normalized to a fixed scale — they grow with the number of rules and subjects.
+    </Info>
+
+    The engine always returns **up to three** results. If fewer than three conflict-free combinations exist, the array will have fewer entries.
+  </Step>
+
+  <Step title="Save your preferred schedule">
+    Once you choose a result, save it by passing the section IDs from the combination you want:
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/saved-schedules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Spring 2026 schedule",
+        "sectionIds": [
+          "sec-uuid-0001-0000-0000-000000000001",
+          "sec-uuid-0002-0000-0000-000000000001"
+        ]
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "saved-uuid-0001",
+      "name": "Spring 2026 schedule",
+      "userId": "user-uuid",
+      "createdAt": "2026-03-15T10:30:00.000Z",
+      "schedulesSections": [
+        { "sectionId": "sec-uuid-0001-0000-0000-000000000001" },
+        { "sectionId": "sec-uuid-0002-0000-0000-000000000001" }
+      ]
+    }
+    ```
+    </CodeGroup>
+
+    Retrieve your saved schedules at any time with `GET /api/saved-schedules`.
+  </Step>
+</Steps>
+
+<Note>
+  If the engine finds no valid combinations, it throws a `400 Bad Request` with a message like `No sections found for subject <id>` or a message from the engine describing why no combinations could be assembled. This usually means every section of a subject was eliminated by a hard constraint rule (`AVOID_PROFESSOR` or `LUNCH_BREAK_PROTECTED`), or all section combinations have time conflicts. Check your rules and section data if this happens.
+</Note>
+
+## Tips for better results
+
+- Add multiple sections per subject to give the engine more combinations to explore.
+- Use `PREFER_MORNING` or `PREFER_AFTERNOON` to steer the engine toward your preferred time of day.
+- Use `COMPACT_DAYS` if you want fewer class days per week.
+- Read [Managing optimization rules](/guides/manage-rules) to understand how to combine rules for the best outcomes.

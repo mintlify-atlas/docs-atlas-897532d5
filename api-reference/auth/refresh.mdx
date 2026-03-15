@@ -1,0 +1,65 @@
+---
+title: "POST /api/auth/refresh"
+description: "Exchange a valid refresh token cookie for a new access token."
+---
+
+## Overview
+
+Issues a new access token using the `refreshToken` cookie set during login. The server also rotates the refresh token — a new `refreshToken` cookie replaces the old one, extending your session for another 7 days.
+
+Call this endpoint when your access token expires (after 15 minutes) rather than asking the user to log in again.
+
+## Request
+
+### HTTP method and path
+
+`POST /api/auth/refresh`
+
+### Authentication
+
+Requires the `refreshToken` HttpOnly cookie. This cookie is set automatically by `/api/auth/login` and is sent by the browser on every request to the same origin — you do not need to add it manually in most clients.
+
+<Warning>
+  If you are calling this endpoint from a non-browser client (e.g., a mobile app or server-side script), you must manage the `refreshToken` cookie yourself and include it with each request.
+</Warning>
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="accessToken" type="string" required>
+  A new signed JWT. Expires after **15 minutes**. Use it in the `Authorization: Bearer <token>` header for all protected endpoints.
+</ResponseField>
+
+<Info>
+  The response also sets a new **HttpOnly** `refreshToken` cookie, replacing the previous one. The old refresh token is invalidated after rotation.
+</Info>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url https://api.scheduly.app/api/auth/refresh \
+  --cookie-jar cookies.txt \
+  --cookie cookies.txt
+```
+
+```json Response
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhM2Y4YzJkMS00YjVlLTRmNmEtOGM5ZC0wZTFmMmEzYjRjNWQiLCJ1c2VybmFtZSI6Impob2phblJvcCIsImlhdCI6MTc0MjAzMjkwMCwiZXhwIjoxNzQyMDMzODAwfQ.newsignature"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The `refreshToken` cookie is missing, has expired (after 7 days), or has been tampered with. Direct the user back to `/api/auth/login`. |

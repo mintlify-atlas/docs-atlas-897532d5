@@ -1,0 +1,362 @@
+---
+title: "Managing optimization rules"
+description: "Create, configure, and organize rules to get the best results from the Scheduly scheduling engine."
+keywords: ["rules", "optimization", "priority", "hard constraints", "soft constraints", "scoring", "CRUD"]
+---
+
+Rules are how you tell the scheduling engine what matters to you. Before generating a schedule, you define a set of rules under your account. The engine reads them in priority order and uses them to score every conflict-free combination it finds.
+
+<Tip>
+  Start with two or three high-priority rules that reflect your most important preferences (for example, morning classes and no gaps). Add more rules incrementally if the results aren't meeting your expectations — too many rules with similar priorities can dilute the scoring signal.
+</Tip>
+
+## How priority order works
+
+Every rule has a `priorityOrder` field — a positive integer where **lower numbers mean higher weight**. The engine converts priority order to a scoring weight using:
+
+```
+weight = 100 / priorityOrder
+```
+
+A rule at `priorityOrder: 1` is worth up to 100 points per combination. A rule at `priorityOrder: 4` is worth up to 25 points. This means you should assign `priorityOrder: 1` to the rule that matters most to you.
+
+## Hard vs. soft constraints
+
+Rules fall into two categories:
+
+| Category | Rules | Effect |
+|---|---|---|
+| **Soft constraints** | All rules except the two below | Score each combination — higher score means better fit |
+| **Hard constraints** | `LUNCH_BREAK_PROTECTED`, `AVOID_PROFESSOR` | Eliminate sections before scoring begins |
+
+<Warning>
+  `LUNCH_BREAK_PROTECTED` and `AVOID_PROFESSOR` are hard constraints. They run during the **pruning phase**, before the backtracking search starts. Any section that violates these rules is removed entirely — it will never appear in any generated result. If every section of a subject is pruned by a hard constraint, generation will fail with a `400 Bad Request`. Be careful when combining these rules with subjects that have few sections.
+</Warning>
+
+## Rule types reference
+
+### Rules with no parameters
+
+These rules require only a `type` and `priorityOrder`:
+
+| Type | Description |
+|---|---|
+| `NO_GAPS` | Penalizes idle time between consecutive classes on the same day |
+| `NO_EARLY_MORNINGS` | Penalizes classes that start before 08:00 |
+| `NO_LATE_EVENINGS` | Penalizes classes that end after 18:00 |
+| `PREFER_MORNING` | Rewards classes that fall in the 06:00–14:00 window |
+| `PREFER_AFTERNOON` | Rewards classes that fall in the 14:00–22:00 window |
+| `COMPACT_DAYS` | Rewards schedules that concentrate classes on fewer days |
+| `BALANCED_LOAD` | Rewards an even distribution of class hours across days |
+
+### Rules with parameters
+
+<AccordionGroup>
+  <Accordion title="MIN_FREE_DAY">
+    Rewards combinations that leave at least one fully free day. Optionally specify which day you want free.
+
+    **Parameter type:** `daySelect` — an integer from 1 (Monday) to 7 (Sunday)
+
+    ```json
+    {
+      "type": "MIN_FREE_DAY",
+      "priorityOrder": 2,
+      "parameters": {
+        "type": "daySelect",
+        "value": 5
+      }
+    }
+    ```
+
+    Omit `parameters` entirely to reward any free day (no specific day required).
+  </Accordion>
+
+  <Accordion title="MAX_CONSECUTIVE_HOURS">
+    Penalizes combinations where back-to-back class time on a single day exceeds the limit you set. Useful for avoiding exhausting full-day blocks with no breaks.
+
+    **Parameter type:** `number` — an integer from 1 to 8 representing the maximum allowed consecutive hours
+
+    ```json
+    {
+      "type": "MAX_CONSECUTIVE_HOURS",
+      "priorityOrder": 2,
+      "parameters": {
+        "type": "number",
+        "value": 3
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="LUNCH_BREAK_PROTECTED (hard constraint)">
+    Removes any section whose time range overlaps the window you define. No combination will ever include a section during this window.
+
+    **Parameter type:** `timeRange` — a start and end time in `HH:MM` format
+
+    ```json
+    {
+      "type": "LUNCH_BREAK_PROTECTED",
+      "priorityOrder": 1,
+      "parameters": {
+        "type": "timeRange",
+        "value": {
+          "start": "12:00",
+          "end": "14:00"
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="AVOID_PROFESSOR (hard constraint)">
+    Removes all sections taught by the specified professor. Use the professor's UUID as the value.
+
+    **Parameter type:** `professorSelect` — the UUID of a professor in your account
+
+    ```json
+    {
+      "type": "AVOID_PROFESSOR",
+      "priorityOrder": 1,
+      "parameters": {
+        "type": "professorSelect",
+        "value": "prof-uuid-0001-0000-0000-000000000001"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## CRUD operations
+
+<Info>
+  All rule endpoints require a valid Bearer token. Rules are scoped to your user account — you can only see and modify your own rules.
+</Info>
+
+### Create a rule
+
+<Tabs>
+  <Tab title="No parameters">
+    ```bash
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "type": "NO_GAPS",
+        "priorityOrder": 1
+      }'
+    ```
+  </Tab>
+  <Tab title="With timeRange">
+    ```bash
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "type": "LUNCH_BREAK_PROTECTED",
+        "priorityOrder": 1,
+        "parameters": {
+          "type": "timeRange",
+          "value": {
+            "start": "12:00",
+            "end": "14:00"
+          }
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="With number">
+    ```bash
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "type": "MAX_CONSECUTIVE_HOURS",
+        "priorityOrder": 2,
+        "parameters": {
+          "type": "number",
+          "value": 3
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="With professorSelect">
+    ```bash
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "type": "AVOID_PROFESSOR",
+        "priorityOrder": 1,
+        "parameters": {
+          "type": "professorSelect",
+          "value": "prof-uuid-0001-0000-0000-000000000001"
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+A successful create returns `201 Created` with the new rule object:
+
+```json
+{
+  "id": "rule-uuid-0001",
+  "type": "NO_GAPS",
+  "priorityOrder": 1,
+  "parameters": null,
+  "userId": "user-uuid"
+}
+```
+
+### List all rules
+
+Returns all your rules sorted by `priorityOrder` ascending:
+
+<CodeGroup>
+```bash curl
+curl http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json response
+[
+  {
+    "id": "rule-uuid-0001",
+    "type": "NO_GAPS",
+    "priorityOrder": 1,
+    "parameters": null,
+    "userId": "user-uuid"
+  },
+  {
+    "id": "rule-uuid-0002",
+    "type": "LUNCH_BREAK_PROTECTED",
+    "priorityOrder": 1,
+    "parameters": {
+      "type": "timeRange",
+      "value": { "start": "12:00", "end": "14:00" }
+    },
+    "userId": "user-uuid"
+  },
+  {
+    "id": "rule-uuid-0003",
+    "type": "COMPACT_DAYS",
+    "priorityOrder": 2,
+    "parameters": null,
+    "userId": "user-uuid"
+  }
+]
+```
+</CodeGroup>
+
+### Get a single rule
+
+```bash
+curl http://localhost:3000/api/rules/rule-uuid-0001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Update a rule
+
+Use `PUT` to replace a rule's type, priority, or parameters:
+
+```bash
+curl -X PUT http://localhost:3000/api/rules/rule-uuid-0001 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "NO_GAPS",
+    "priorityOrder": 2
+  }'
+```
+
+### Delete a rule
+
+```bash
+curl -X DELETE http://localhost:3000/api/rules/rule-uuid-0001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+A successful delete returns `204 No Content` with no body.
+
+## Common rule configurations
+
+Below are example rule sets for common scheduling goals.
+
+### No gaps, prefer mornings
+
+For a student who wants classes to run back-to-back and prefers finishing before the afternoon:
+
+```bash
+# Highest priority: no idle time between classes
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "NO_GAPS", "priorityOrder": 1}'
+
+# Second priority: morning time window
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "PREFER_MORNING", "priorityOrder": 2}'
+
+# Third priority: avoid very early starts
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "NO_EARLY_MORNINGS", "priorityOrder": 3}'
+```
+
+### Protected lunch break and compact days
+
+For a student who needs their midday free and wants to avoid spreading classes across the whole week:
+
+```bash
+# Hard constraint: no classes from 12:00 to 14:00
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "LUNCH_BREAK_PROTECTED",
+    "priorityOrder": 1,
+    "parameters": {
+      "type": "timeRange",
+      "value": {"start": "12:00", "end": "14:00"}
+    }
+  }'
+
+# Soft constraint: fewer class days
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "COMPACT_DAYS", "priorityOrder": 2}'
+```
+
+### Avoid a specific professor
+
+For a student who wants to avoid a particular professor's sections entirely:
+
+```bash
+# Hard constraint: remove all sections taught by Prof. Smith
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "AVOID_PROFESSOR",
+    "priorityOrder": 1,
+    "parameters": {
+      "type": "professorSelect",
+      "value": "prof-uuid-0001-0000-0000-000000000001"
+    }
+  }'
+
+# Soft constraint: compact schedule as fallback preference
+curl -X POST http://localhost:3000/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "COMPACT_DAYS", "priorityOrder": 2}'
+```
+
+## Next steps
+
+- Follow the [Generating a schedule](/guides/generate-schedule) guide to put your rules into action.
+- Read the [Optimization rules](/concepts/rules) concept page for a deeper explanation of the scoring formula and parameter type details.

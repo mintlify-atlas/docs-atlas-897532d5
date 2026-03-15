@@ -5,3 +5,9 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# Legacy starter kit files (not part of this project)
+essentials/
+ai-tools/
+development.mdx
+snippets/

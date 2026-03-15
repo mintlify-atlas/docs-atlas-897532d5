@@ -1,0 +1,154 @@
+---
+title: "POST /api/sections"
+description: "Create a new section for a subject belonging to the authenticated user."
+---
+
+## Overview
+
+Creates a section and associates it with a subject owned by the authenticated user. A section defines the time slot and days when a class meets, and can optionally be assigned to a professor.
+
+<Note>
+  Day IDs use a fixed reference: 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday, 7 = Sunday.
+</Note>
+
+## Request
+
+### HTTP method and path
+
+`POST /api/sections`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Request body
+
+<ParamField body="subjectId" type="string" required placeholder="b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e">
+  UUID of the subject this section belongs to. The subject must be owned by the authenticated user.
+</ParamField>
+
+<ParamField body="startTime" type="string" required placeholder="08:00">
+  Start time of the section in `HH:MM` 24-hour format (e.g., `"08:00"`, `"13:30"`).
+</ParamField>
+
+<ParamField body="endTime" type="string" required placeholder="10:00">
+  End time of the section in `HH:MM` 24-hour format (e.g., `"10:00"`, `"15:00"`).
+</ParamField>
+
+<ParamField body="dayIds" type="number[]" required placeholder="[1, 3, 5]">
+  Array of day IDs indicating which days the section meets. Each value must be an integer between 1 and 7 inclusive. At least one day ID is required.
+</ParamField>
+
+<ParamField body="professorId" type="string" placeholder="e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b">
+  UUID of the professor assigned to this section. The professor must be owned by the authenticated user. Omit or pass `null` to leave the section unassigned.
+</ParamField>
+
+## Response
+
+HTTP `201 Created`
+
+<ResponseField name="id" type="string" required>
+  UUID that uniquely identifies the section.
+</ResponseField>
+
+<ResponseField name="startTime" type="string" required>
+  Start time stored as an ISO 8601 timestamp. Use the time portion only (e.g., `"1970-01-01T08:00:00.000Z"`).
+</ResponseField>
+
+<ResponseField name="endTime" type="string" required>
+  End time stored as an ISO 8601 timestamp.
+</ResponseField>
+
+<ResponseField name="subjectId" type="string" required>
+  UUID of the subject this section belongs to.
+</ResponseField>
+
+<ResponseField name="professorId" type="string">
+  UUID of the assigned professor, or `null` if no professor is assigned.
+</ResponseField>
+
+<ResponseField name="sectionDays" type="object[]" required>
+  <Expandable title="sectionDay properties">
+    <ResponseField name="id" type="string" required>
+      UUID of the section-day join record.
+    </ResponseField>
+    <ResponseField name="sectionId" type="string" required>
+      UUID of the parent section.
+    </ResponseField>
+    <ResponseField name="dayId" type="number" required>
+      Day ID (1–7).
+    </ResponseField>
+    <ResponseField name="day" type="object" required>
+      <Expandable title="day properties">
+        <ResponseField name="id" type="number" required>
+          Numeric day ID.
+        </ResponseField>
+        <ResponseField name="name" type="string" required>
+          Lowercase day name (e.g., `"monday"`).
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url https://api.scheduly.app/api/sections \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "subjectId": "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+    "startTime": "08:00",
+    "endTime": "10:00",
+    "dayIds": [1, 3, 5],
+    "professorId": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b"
+  }'
+```
+
+```json Response
+{
+  "id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+  "startTime": "1970-01-01T08:00:00.000Z",
+  "endTime": "1970-01-01T10:00:00.000Z",
+  "subjectId": "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+  "professorId": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+  "sectionDays": [
+    {
+      "id": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+      "sectionId": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+      "dayId": 1,
+      "day": { "id": 1, "name": "monday" }
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8b9c-0d1e-f2a3b4c5d6e7",
+      "sectionId": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+      "dayId": 3,
+      "day": { "id": 3, "name": "wednesday" }
+    },
+    {
+      "id": "c3d4e5f6-a7b8-9c0d-1e2f-a3b4c5d6e7f8",
+      "sectionId": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+      "dayId": 5,
+      "day": { "id": 5, "name": "friday" }
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | One or more fields are missing, incorrectly formatted, or contain out-of-range day IDs. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | The specified `subjectId` or `professorId` does not exist or does not belong to the authenticated user. |

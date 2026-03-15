@@ -1,0 +1,65 @@
+---
+title: "DELETE /api/sections/:id"
+description: "Permanently delete a section and its associated day records."
+---
+
+## Overview
+
+Deletes a section by UUID. The section must belong to a subject owned by the authenticated user.
+
+<Warning>
+  Deleting a section is irreversible. All associated `SectionDay` records are automatically deleted as well (cascade delete).
+</Warning>
+
+## Request
+
+### HTTP method and path
+
+`DELETE /api/sections/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a">
+  UUID of the section to delete.
+</ParamField>
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `204 No Content`
+
+The response body is empty on success.
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request DELETE \
+  --url https://api.scheduly.app/api/sections/d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+(empty body — 204 No Content)
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No section with the given ID exists for the authenticated user. |

@@ -1,0 +1,70 @@
+---
+title: "Introduction"
+description: "Scheduly is a NestJS REST API that generates optimized university academic schedules using a two-phase backtracking engine."
+keywords: ["scheduly", "scheduling", "api", "university", "academic", "optimization"]
+---
+
+Scheduly is a REST API for generating optimized academic schedules for university students. You describe your subjects, professors, and time sections, define preferences as weighted rules, and the engine returns the three best schedule combinations ranked by score.
+
+The API is built with NestJS and TypeScript, uses PostgreSQL with Prisma, and secures every endpoint with JWT authentication.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Clone the repo, configure your environment, and generate your first schedule in minutes.
+  </Card>
+  <Card title="Authentication" icon="lock" href="/authentication">
+    Learn how JWT access tokens and HttpOnly refresh token cookies work together.
+  </Card>
+  <Card title="Scheduling engine" icon="cpu" href="/concepts/scheduling-engine">
+    Understand the two-phase pruning and backtracking algorithm in depth.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference">
+    Browse every endpoint with request and response schemas.
+  </Card>
+</CardGroup>
+
+## Key features
+
+- **Two-phase optimization engine** — a pruning pass eliminates hard constraint violations before backtracking, keeping search space small
+- **11 rule types** — cover time-of-day preferences, load balancing, gap avoidance, professor exclusion, lunch break protection, and more
+- **Priority-weighted scoring** — each rule carries a user-defined priority so the engine ranks schedules by what matters most to you
+- **Top-3 results** — every generation call returns the three highest-scoring conflict-free combinations
+- **JWT authentication** — short-lived access tokens (15 min) paired with rotating HttpOnly refresh tokens (7 days)
+- **Save schedules** — persist a generated schedule for later retrieval via `POST /api/saved-schedules`
+- **Full CRUD resources** — manage subjects, professors, sections, rules, and saved schedules through a consistent REST interface
+- **Interactive Swagger UI** — available at `http://localhost:3000/docs` when the server is running
+
+## How the engine works
+
+When you call `POST /api/scheduling/generate`, the engine runs two phases against the sections that belong to your requested subjects:
+
+**Phase 1 — Pruning**
+
+The engine scans every section and removes any that violate absolute (hard) constraints before search begins. Currently this covers two rule types:
+
+- `AVOID_PROFESSOR` — drops all sections taught by a professor you have excluded
+- `LUNCH_BREAK_PROTECTED` — drops sections whose time slot overlaps the lunch window you defined
+
+This step is cheap and dramatically reduces the number of combinations the backtracker needs to explore.
+
+**Phase 2 — Backtracking with scoring**
+
+The engine builds schedule combinations one subject at a time. At each step it only places a section if it does not create a time conflict with already-placed sections. When a complete, conflict-free combination is assembled, it is scored by evaluating every remaining (soft) rule against the combination. Each rule contributes a weighted score based on its `priority` field.
+
+The engine keeps the best three combinations by score and returns them once all valid combinations have been evaluated.
+
+## Available rule types
+
+| Rule | Description |
+|------|-------------|
+| `NO_GAPS` | Penalizes gaps between consecutive classes on the same day |
+| `NO_EARLY_MORNINGS` | Penalizes classes that start before 08:00 |
+| `NO_LATE_EVENINGS` | Penalizes classes that end after 18:00 |
+| `PREFER_MORNING` | Rewards classes scheduled between 06:00 and 14:00 |
+| `PREFER_AFTERNOON` | Rewards classes scheduled between 14:00 and 22:00 |
+| `COMPACT_DAYS` | Rewards schedules that concentrate classes into fewer days |
+| `BALANCED_LOAD` | Rewards an even distribution of hours across class days |
+| `MIN_FREE_DAY` | Rewards having at least one fully free day |
+| `MAX_CONSECUTIVE_HOURS` | Penalizes blocks of consecutive hours that exceed your limit |
+| `LUNCH_BREAK_PROTECTED` | Hard constraint — removes sections overlapping your lunch window |
+| `AVOID_PROFESSOR` | Hard constraint — removes all sections taught by a specific professor |

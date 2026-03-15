@@ -1,0 +1,79 @@
+---
+title: "GET /api/subjects"
+description: "Retrieve all subjects belonging to the authenticated user."
+---
+
+## Overview
+
+Returns every subject that was created by the authenticated user. Subjects from other users are never included in the response.
+
+## Request
+
+### HTTP method and path
+
+`GET /api/subjects`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `200 OK`
+
+An array of subject objects. Returns an empty array `[]` when the user has no subjects.
+
+<ResponseField name="[]" type="object[]" required>
+  <Expandable title="subject properties">
+    <ResponseField name="id" type="string" required>
+      UUID that uniquely identifies the subject.
+    </ResponseField>
+    <ResponseField name="name" type="string" required>
+      Display name of the subject.
+    </ResponseField>
+    <ResponseField name="userId" type="string" required>
+      UUID of the user who owns this subject.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request GET \
+  --url https://api.scheduly.app/api/subjects \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+[
+  {
+    "id": "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+    "name": "Mathematics",
+    "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+  },
+  {
+    "id": "c2d3e4f5-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
+    "name": "Physics",
+    "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+  }
+]
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |

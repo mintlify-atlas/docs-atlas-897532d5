@@ -1,97 +1,86 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Scheduly API"
+description: "Intelligent academic schedule optimizer for university students. Generate optimal class schedules using a backtracking algorithm with a priority-based scoring rule system."
 ---
 
-## Setting up
-
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get your first optimized schedule generated in minutes.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Authentication" icon="lock" href="/authentication">
+    Learn how JWT tokens and refresh cookies work.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Scheduling Engine" icon="brain" href="/concepts/scheduling-engine">
+    Understand the backtracking algorithm and scoring system.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api-reference/auth/register">
+    Explore every endpoint with parameters and examples.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What is Scheduly API?
 
-Everything you need to create world-class documentation.
+Scheduly API is a REST API built with NestJS that solves a common university problem: finding the best combination of class sections for a semester. Given a list of subjects you need to take, the API evaluates all valid combinations (no time conflicts) and ranks them according to your personal preferences.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+The engine works in two phases:
 
-## Need inspiration?
+1. **Pruning** — Eliminates sections that violate hard constraints (e.g., avoid a specific professor, protect a lunch break window).
+2. **Backtracking + Scoring** — Explores all valid conflict-free combinations and scores each one based on your prioritized rules. Returns the top 3 best schedules.
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Smart optimization" icon="wand-magic-sparkles">
+    Backtracking algorithm finds conflict-free combinations and ranks them by your preferences.
+  </Card>
+  <Card title="11 rule types" icon="list-check">
+    Configure rules like NO_GAPS, PREFER_MORNING, COMPACT_DAYS, AVOID_PROFESSOR, and more.
+  </Card>
+  <Card title="Priority-based scoring" icon="ranking-star">
+    Assign priority order to rules so higher-priority preferences weigh more in the score.
+  </Card>
+  <Card title="JWT authentication" icon="shield-check">
+    Access tokens + HttpOnly refresh token cookies for secure, stateless auth.
+  </Card>
+  <Card title="Full CRUD resources" icon="database">
+    Manage subjects, professors, sections, rules, and saved schedules via REST endpoints.
+  </Card>
+  <Card title="Save your schedule" icon="bookmark">
+    Persist your preferred generated schedule and retrieve it later.
+  </Card>
+</CardGroup>
+
+## How it works
+
+<Steps>
+  <Step title="Register and authenticate">
+    Create an account and obtain a JWT access token.
+  </Step>
+  <Step title="Add your subjects and professors">
+    Create the subjects you want to take and the professors who teach them.
+  </Step>
+  <Step title="Create sections">
+    Add section records for each subject, including start/end times and days of the week.
+  </Step>
+  <Step title="Configure optimization rules">
+    Define rules like `NO_GAPS`, `PREFER_MORNING`, or `AVOID_PROFESSOR` with priority ordering.
+  </Step>
+  <Step title="Generate schedules">
+    Call `POST /api/scheduling/generate` with your subject IDs. Get back the top 3 ranked combinations.
+  </Step>
+  <Step title="Save your favorite">
+    Persist the preferred schedule with `POST /api/saved-schedules` for future reference.
+  </Step>
+</Steps>
+
+## Technology stack
+
+| Component | Technology |
+|-----------|-----------|
+| Framework | NestJS 11 |
+| Language | TypeScript 5 |
+| Database | PostgreSQL 14+ |
+| ORM | Prisma 7 |
+| Auth | JWT + Refresh Tokens (HttpOnly Cookies) |
+| Docs | Swagger / OpenAPI |
+| Runtime | Node.js 20 |

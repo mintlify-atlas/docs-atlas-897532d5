@@ -1,0 +1,255 @@
+---
+title: 'Optimization rules'
+description: 'User-defined preferences that control how the scheduling engine scores and filters schedule combinations.'
+keywords: ['rules', 'optimization', 'scoring', 'pruning', 'constraints', 'preferences']
+---
+
+Rules tell the scheduling engine what kind of schedule you prefer. You define them before generating a schedule, and the engine uses them in two ways:
+
+- **Hard constraints** (pruning rules) — sections that violate these rules are removed before the search begins. No combination containing a violating section will ever be returned.
+- **Soft constraints** (scoring rules) — these contribute a weighted score to each combination. The engine returns the combinations with the highest total score.
+
+## Priority order and scoring weight
+
+Every rule has a `priorityOrder` (a positive integer). Lower numbers mean higher priority, which translates directly to a larger scoring weight:
+
+```
+weight = 100 / priorityOrder
+```
+
+A rule at `priorityOrder: 1` contributes up to 100 points per combination. A rule at `priorityOrder: 4` contributes up to 25 points. Use priority order to express which preferences matter most to you.
+
+<Note>
+  `LUNCH_BREAK_PROTECTED` and `AVOID_PROFESSOR` are **pruning rules**. They run before scoring and remove sections entirely. Their `priorityOrder` still affects how much weight they carry if their scoring strategy is ever evaluated, but their primary effect is to eliminate sections — not to adjust scores.
+</Note>
+
+## Rule types
+
+<AccordionGroup>
+  <Accordion title="NO_GAPS — avoid gaps between classes">
+    Penalizes combinations that leave idle time between classes on the same day. Rewards schedules where classes are back-to-back.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "NO_GAPS",
+      "priorityOrder": 1
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="NO_EARLY_MORNINGS — avoid early classes">
+    Penalizes any section that starts before 08:00.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "NO_EARLY_MORNINGS",
+      "priorityOrder": 2
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="NO_LATE_EVENINGS — avoid late classes">
+    Penalizes any section that ends after 18:00.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "NO_LATE_EVENINGS",
+      "priorityOrder": 2
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="PREFER_MORNING — reward morning classes">
+    Rewards combinations where classes fall in the 06:00–14:00 window.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "PREFER_MORNING",
+      "priorityOrder": 1
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="PREFER_AFTERNOON — reward afternoon classes">
+    Rewards combinations where classes fall in the 14:00–22:00 window.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "PREFER_AFTERNOON",
+      "priorityOrder": 1
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="COMPACT_DAYS — minimize the number of class days">
+    Rewards combinations that concentrate classes on fewer days of the week, leaving more completely free days.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "COMPACT_DAYS",
+      "priorityOrder": 3
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="BALANCED_LOAD — even distribution of hours">
+    Rewards combinations where class hours are distributed evenly across the days you have classes, rather than overloading one day.
+
+    **Parameters:** none
+
+    ```json
+    {
+      "type": "BALANCED_LOAD",
+      "priorityOrder": 3
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="MIN_FREE_DAY — guarantee at least one free day">
+    Rewards combinations that leave at least one day with no classes. Optionally, you can specify which day you want free.
+
+    **Parameters:** `{ type: "daySelect", value: 1–7 }` (optional — omit `parameters` to allow any free day)
+
+    Day values follow the database `Day.id` field: 1 = Monday through 7 = Sunday.
+
+    ```json
+    {
+      "type": "MIN_FREE_DAY",
+      "priorityOrder": 2,
+      "parameters": {
+        "type": "daySelect",
+        "value": 5
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="MAX_CONSECUTIVE_HOURS — limit back-to-back class hours">
+    Penalizes combinations that have a block of consecutive class time longer than the specified limit. This helps avoid exhausting days with no breaks.
+
+    **Parameters:** `{ type: "number", value: 1–8 }` (required)
+
+    ```json
+    {
+      "type": "MAX_CONSECUTIVE_HOURS",
+      "priorityOrder": 2,
+      "parameters": {
+        "type": "number",
+        "value": 3
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="LUNCH_BREAK_PROTECTED — hard constraint: protect a lunch window">
+    Removes any section whose time range overlaps the protected window. No combination will include a section that falls within this range.
+
+    **Parameters:** `{ type: "timeRange", value: { start: "HH:MM", end: "HH:MM" } }` (required)
+
+    ```json
+    {
+      "type": "LUNCH_BREAK_PROTECTED",
+      "priorityOrder": 1,
+      "parameters": {
+        "type": "timeRange",
+        "value": {
+          "start": "12:00",
+          "end": "13:30"
+        }
+      }
+    }
+    ```
+
+    <Warning>
+      This is a hard constraint. Sections that overlap the protected window are removed before scoring begins. If every section of a subject falls within the protected window, schedule generation will fail with an error.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="AVOID_PROFESSOR — hard constraint: exclude a professor's sections">
+    Removes all sections taught by the specified professor. No combination will include any section where `professorId` matches the given UUID.
+
+    **Parameters:** `{ type: "professorSelect", value: "<professor-uuid>" }` (required)
+
+    ```json
+    {
+      "type": "AVOID_PROFESSOR",
+      "priorityOrder": 1,
+      "parameters": {
+        "type": "professorSelect",
+        "value": "c9d8e7f6-a5b4-3c2d-1e0f-9a8b7c6d5e4f"
+      }
+    }
+    ```
+
+    <Warning>
+      This is a hard constraint. If the avoided professor teaches all available sections of a subject, schedule generation will fail with an error.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Summary table
+
+| Type | Category | Parameters |
+|------|----------|------------|
+| `NO_GAPS` | Soft | None |
+| `NO_EARLY_MORNINGS` | Soft | None |
+| `NO_LATE_EVENINGS` | Soft | None |
+| `PREFER_MORNING` | Soft | None |
+| `PREFER_AFTERNOON` | Soft | None |
+| `COMPACT_DAYS` | Soft | None |
+| `BALANCED_LOAD` | Soft | None |
+| `MIN_FREE_DAY` | Soft | `daySelect` (optional) |
+| `MAX_CONSECUTIVE_HOURS` | Soft | `number` (required, 1–8) |
+| `LUNCH_BREAK_PROTECTED` | **Hard** | `timeRange` (required) |
+| `AVOID_PROFESSOR` | **Hard** | `professorSelect` (required) |
+
+## Parameter types
+
+<Tabs>
+  <Tab title="number">
+    A single integer within a defined range.
+
+    ```json
+    { "type": "number", "value": 3 }
+    ```
+  </Tab>
+  <Tab title="timeRange">
+    A start and end time in `HH:MM` format.
+
+    ```json
+    {
+      "type": "timeRange",
+      "value": {
+        "start": "12:00",
+        "end": "13:30"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="daySelect">
+    An integer from 1 to 7, where 1 = Monday and 7 = Sunday.
+
+    ```json
+    { "type": "daySelect", "value": 5 }
+    ```
+  </Tab>
+  <Tab title="professorSelect">
+    The UUID of a professor in your account.
+
+    ```json
+    { "type": "professorSelect", "value": "c9d8e7f6-a5b4-3c2d-1e0f-9a8b7c6d5e4f" }
+    ```
+  </Tab>
+</Tabs>

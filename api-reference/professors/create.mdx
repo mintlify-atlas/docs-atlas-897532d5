@@ -1,0 +1,75 @@
+---
+title: "POST /api/professors"
+description: "Create a new professor belonging to the authenticated user."
+---
+
+## Overview
+
+Creates a professor and associates them with the authenticated user. Professors can then be assigned to class sections. Each user manages their own independent list of professors.
+
+## Request
+
+### HTTP method and path
+
+`POST /api/professors`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Request body
+
+<ParamField body="fullName" type="string" required placeholder="Juan Pérez">
+  Full name of the professor. Maximum 100 characters.
+</ParamField>
+
+## Response
+
+HTTP `201 Created`
+
+<ResponseField name="id" type="string" required>
+  UUID that uniquely identifies the professor.
+</ResponseField>
+
+<ResponseField name="fullName" type="string" required>
+  The full name of the professor as provided in the request.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this professor.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url https://api.scheduly.app/api/professors \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "fullName": "Juan Pérez"
+  }'
+```
+
+```json Response
+{
+  "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+  "fullName": "Juan Pérez",
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | The `fullName` field is missing or exceeds 100 characters. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |

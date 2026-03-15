@@ -1,0 +1,156 @@
+---
+title: 'Scheduling engine'
+description: 'How Scheduly generates optimized schedule combinations using two-phase backtracking and scoring.'
+keywords: ['scheduling', 'engine', 'backtracking', 'scoring', 'pruning', 'optimization']
+---
+
+The scheduling engine takes a set of subjects (each with multiple sections) and a list of user-defined rules, then returns the top 3 schedule combinations ranked by score.
+
+It works in two phases: **pruning** removes sections that violate hard constraints before the search begins, and **backtracking + scoring** explores the remaining combinations and ranks them.
+
+## How it works
+
+<Steps>
+  <Step title="Input preparation">
+    You call `POST /api/scheduling/generate` with an array of subject IDs. The engine fetches every section for each subject, including its professor, subject name, and scheduled days.
+  </Step>
+  <Step title="Phase 1 — Pruning">
+    Before exploring any combinations, the `SectionPruner` filters out sections that violate hard constraints. Only two rule types run in this phase: `AVOID_PROFESSOR` and `LUNCH_BREAK_PROTECTED`.
+
+    If all sections for a subject are pruned, the engine throws an error instead of returning an empty result.
+
+    ```typescript
+    for (const [subjectId, sections] of sectionsBySubject) {
+      const pruned = this.pruner.prune(sections, userRules);
+
+      if (pruned.length === 0) {
+        throw new Error(
+          `No available sections for subject ${subjectId} after applying rules.`,
+        );
+      }
+
+      prunedSectionsBySubject.set(subjectId, pruned);
+    }
+    ```
+
+    Subjects with fewer sections are sorted first to reduce the number of branches the backtracker must explore.
+  </Step>
+  <Step title="Phase 2 — Backtracking">
+    The engine recursively picks one section per subject, skipping any section that causes a time conflict with sections already chosen in the current combination.
+
+    ```typescript
+    private hasConflict(
+      section: SectionWithRelations,
+      current: SectionWithRelations[],
+    ): boolean {
+      for (const chosen of current) {
+        const sharedDays = section.sectionDays.some((sd) =>
+          chosen.sectionDays.some((cd) => cd.day.name === sd.day.name),
+        );
+
+        if (!sharedDays) continue;
+
+        const sectionStart = section.startTime.getTime();
+        const sectionEnd   = section.endTime.getTime();
+        const chosenStart  = chosen.startTime.getTime();
+        const chosenEnd    = chosen.endTime.getTime();
+
+        const overlaps = sectionStart < chosenEnd && sectionEnd > chosenStart;
+        if (overlaps) return true;
+      }
+
+      return false;
+    }
+    ```
+
+    Two sections conflict when they share at least one day **and** their time ranges overlap — `startA < endB && endA > startB`.
+  </Step>
+  <Step title="Phase 2 — Scoring">
+    When a complete, conflict-free combination is found, `RuleScorer` evaluates it against every user rule.
+
+    Each rule contributes a weighted score:
+
+    ```typescript
+    const weight = 100 / rule.priorityOrder;
+    const value  = strategy.evaluate(combination, rule.parameters);
+    totalScore  += weight * value;
+    ```
+
+    A rule at `priorityOrder: 1` carries a weight of 100. A rule at `priorityOrder: 5` carries a weight of 20. This means rules you rank first have a proportionally larger effect on the final score.
+  </Step>
+  <Step title="Top-3 selection">
+    After scoring, the combination is inserted into a sorted list capped at 3 entries. Lower-scoring combinations are dropped as better ones are found.
+
+    The final array is returned sorted descending by score.
+  </Step>
+</Steps>
+
+## Time conflict detection
+
+Two sections conflict if both of the following are true:
+
+1. They share at least one day (checked by comparing `day.name` across `sectionDays`).
+2. Their time ranges overlap using the half-open interval test: `sectionStart < chosenEnd && sectionEnd > chosenStart`.
+
+If the sections meet on different days only, there is no conflict regardless of time overlap.
+
+## Scoring weight formula
+
+The weight for each rule is `100 / priorityOrder`. The table below shows how priority maps to weight:
+
+| Priority order | Weight |
+|---------------|--------|
+| 1 | 100 |
+| 2 | 50 |
+| 3 | 33.3 |
+| 5 | 20 |
+| 10 | 10 |
+
+Each rule's strategy returns a numeric `value` between 0 and 1 (or a penalty expressed as a negative). The final score is the sum of `weight × value` across all rules.
+
+## Output format
+
+The engine returns up to 3 `ScheduleResultDto` objects, each representing one ranked combination:
+
+```json
+[
+  {
+    "rank": 1,
+    "score": 183.33,
+    "sections": [
+      {
+        "sectionId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "subject": "Calculus I",
+        "professor": "Dr. Ana Torres",
+        "startTime": "08:00",
+        "endTime": "10:00",
+        "days": ["Monday", "Wednesday"]
+      },
+      {
+        "sectionId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "subject": "Linear Algebra",
+        "professor": null,
+        "startTime": "10:00",
+        "endTime": "12:00",
+        "days": ["Tuesday", "Thursday"]
+      }
+    ]
+  },
+  {
+    "rank": 2,
+    "score": 141.67,
+    "sections": []
+  },
+  {
+    "rank": 3,
+    "score": 108.33,
+    "sections": []
+  }
+]
+```
+
+`startTime` and `endTime` are always formatted as `HH:MM`. `professor` is `null` when no professor is assigned to the section. `score` is rounded to two decimal places.
+
+<Note>
+  If the engine cannot find any valid combinations after pruning — either because all sections conflict or because pruning left no sections for a subject — it throws an error with a descriptive message rather than returning an empty array.
+</Note>

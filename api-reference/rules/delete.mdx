@@ -1,0 +1,65 @@
+---
+title: "DELETE /api/rules/:id"
+description: "Permanently delete a rule."
+---
+
+## Overview
+
+Deletes a rule by UUID. The rule must belong to the authenticated user. Once deleted, the rule is no longer applied by the scheduling engine when you call `POST /api/scheduling/generate`.
+
+<Warning>
+  Deleting a rule is irreversible. If you want to temporarily disable a rule, consider changing its `priorityOrder` to a high number instead of deleting it.
+</Warning>
+
+## Request
+
+### HTTP method and path
+
+`DELETE /api/rules/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a">
+  UUID of the rule to delete.
+</ParamField>
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `204 No Content`
+
+The response body is empty on success.
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request DELETE \
+  --url https://api.scheduly.app/api/rules/d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+(empty body — 204 No Content)
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No rule with the given ID exists for the authenticated user. |

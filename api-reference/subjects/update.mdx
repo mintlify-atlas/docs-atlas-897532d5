@@ -1,0 +1,82 @@
+---
+title: "PUT /api/subjects/:id"
+description: "Replace the name of an existing subject."
+---
+
+## Overview
+
+Updates the `name` of a subject. The subject must belong to the authenticated user. The full subject object is returned after the update.
+
+## Request
+
+### HTTP method and path
+
+`PUT /api/subjects/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e">
+  UUID of the subject to update.
+</ParamField>
+
+### Request body
+
+<ParamField body="name" type="string" required placeholder="Advanced Mathematics">
+  New display name for the subject. Maximum 100 characters.
+</ParamField>
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="id" type="string" required>
+  UUID of the subject.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The updated name of the subject.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this subject.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request PUT \
+  --url https://api.scheduly.app/api/subjects/b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "Advanced Mathematics"
+  }'
+```
+
+```json Response
+{
+  "id": "b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+  "name": "Advanced Mathematics",
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | The `name` field is missing or exceeds 100 characters. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No subject with the given ID exists for the authenticated user. |

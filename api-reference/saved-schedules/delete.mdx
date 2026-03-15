@@ -1,0 +1,65 @@
+---
+title: "DELETE /api/saved-schedules/:id"
+description: "Permanently delete a saved schedule and its section links."
+---
+
+## Overview
+
+Deletes a saved schedule by UUID. The schedule must belong to the authenticated user. All `ScheduleSection` junction records that link this schedule to its sections are deleted automatically (cascade delete).
+
+<Warning>
+  Deleting a saved schedule is irreversible. The underlying sections and subjects are not affected — only the saved schedule record and its junction entries are removed.
+</Warning>
+
+## Request
+
+### HTTP method and path
+
+`DELETE /api/saved-schedules/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="c3d4e5f6-a7b8-9c0d-1e2f-a3b4c5d6e7f8">
+  UUID of the saved schedule to delete.
+</ParamField>
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `204 No Content`
+
+The response body is empty on success.
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request DELETE \
+  --url https://api.scheduly.app/api/saved-schedules/c3d4e5f6-a7b8-9c0d-1e2f-a3b4c5d6e7f8 \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+(empty body — 204 No Content)
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No saved schedule with the given ID exists for the authenticated user. |

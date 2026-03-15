@@ -1,0 +1,65 @@
+---
+title: "DELETE /api/subjects/:id"
+description: "Permanently delete a subject and all of its sections."
+---
+
+## Overview
+
+Deletes a subject by UUID. The subject must belong to the authenticated user.
+
+<Warning>
+  Deleting a subject is irreversible. All sections that belong to the subject are automatically deleted as well (cascade delete). Any saved schedules that reference those sections will also lose those entries.
+</Warning>
+
+## Request
+
+### HTTP method and path
+
+`DELETE /api/subjects/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e">
+  UUID of the subject to delete.
+</ParamField>
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `204 No Content`
+
+The response body is empty on success.
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request DELETE \
+  --url https://api.scheduly.app/api/subjects/b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+```json Response
+(empty body — 204 No Content)
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No subject with the given ID exists for the authenticated user. |

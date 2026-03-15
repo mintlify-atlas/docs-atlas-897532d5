@@ -1,0 +1,82 @@
+---
+title: "PUT /api/professors/:id"
+description: "Replace the name of an existing professor."
+---
+
+## Overview
+
+Updates the `fullName` of a professor. The professor must belong to the authenticated user. The full professor object is returned after the update.
+
+## Request
+
+### HTTP method and path
+
+`PUT /api/professors/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b">
+  UUID of the professor to update.
+</ParamField>
+
+### Request body
+
+<ParamField body="fullName" type="string" required placeholder="Dr. Juan Pérez">
+  New full name for the professor. Maximum 100 characters.
+</ParamField>
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="id" type="string" required>
+  UUID of the professor.
+</ResponseField>
+
+<ResponseField name="fullName" type="string" required>
+  The updated full name of the professor.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this professor.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request PUT \
+  --url https://api.scheduly.app/api/professors/e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "fullName": "Dr. Juan Pérez"
+  }'
+```
+
+```json Response
+{
+  "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+  "fullName": "Dr. Juan Pérez",
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | The `fullName` field is missing or exceeds 100 characters. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No professor with the given ID exists for the authenticated user. |

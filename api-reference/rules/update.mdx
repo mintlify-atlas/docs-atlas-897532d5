@@ -1,0 +1,125 @@
+---
+title: "PUT /api/rules/:id"
+description: "Replace the type, priority, and parameters of an existing rule."
+---
+
+## Overview
+
+Performs a full replacement of a rule's fields. You can change the `type`, `priorityOrder`, and `parameters` in a single request. The rule must belong to the authenticated user.
+
+<Note>
+  This is a full replacement (`PUT`), not a partial update. Any field you omit will be reset to its default. Include all fields you want to retain.
+</Note>
+
+## Request
+
+### HTTP method and path
+
+`PUT /api/rules/:id`
+
+### Authentication
+
+Bearer token required.
+
+```
+Authorization: Bearer <accessToken>
+```
+
+### Path parameters
+
+<ParamField path="id" type="string" required placeholder="d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a">
+  UUID of the rule to update.
+</ParamField>
+
+### Request body
+
+<ParamField body="type" type="string" required placeholder="NO_GAPS">
+  New rule type identifier. Maximum 50 characters.
+</ParamField>
+
+<ParamField body="priorityOrder" type="number" required placeholder="1">
+  New evaluation priority. Minimum value is `1`.
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  New parameters for the rule. Omit or pass `null` for rules that require no configuration.
+
+  <Expandable title="parameter shapes">
+    <ResponseField name="type" type="string" required>
+      Discriminator for the parameter kind. One of: `number`, `timeRange`, `daySelect`, `professorSelect`.
+    </ResponseField>
+    <ResponseField name="value" type="number | object | string">
+      The parameter value. Shape depends on `type`:
+      - `number` — an integer
+      - `timeRange` — an object `{ "start": "HH:MM", "end": "HH:MM" }`
+      - `daySelect` — an integer day ID
+      - `professorSelect` — a UUID string
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="id" type="string" required>
+  UUID of the updated rule.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  The updated rule type.
+</ResponseField>
+
+<ResponseField name="priorityOrder" type="number" required>
+  The updated evaluation priority.
+</ResponseField>
+
+<ResponseField name="parameters" type="object | null" required>
+  The updated parameters, or `null` if none were supplied.
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  UUID of the user who owns this rule.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request PUT \
+  --url https://api.scheduly.app/api/rules/d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "type": "LUNCH_BREAK_PROTECTED",
+    "priorityOrder": 1,
+    "parameters": {
+      "type": "timeRange",
+      "value": { "start": "13:00", "end": "15:00" }
+    }
+  }'
+```
+
+```json Response
+{
+  "id": "d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
+  "type": "LUNCH_BREAK_PROTECTED",
+  "priorityOrder": 1,
+  "parameters": {
+    "type": "timeRange",
+    "value": { "start": "13:00", "end": "15:00" }
+  },
+  "userId": "a3f8c2d1-4b5e-4f6a-8c9d-0e1f2a3b4c5d"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+| Status | Description |
+| ------ | ----------- |
+| `400 Bad Request` | A required field is missing, `priorityOrder` is less than `1`, or `type` exceeds 50 characters. |
+| `401 Unauthorized` | The access token is missing, malformed, or expired. Obtain a fresh token from `/api/auth/refresh`. |
+| `404 Not Found` | No rule with the given ID exists for the authenticated user. |

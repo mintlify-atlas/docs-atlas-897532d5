@@ -1,0 +1,172 @@
+---
+title: "Authentication"
+description: "Scheduly uses short-lived JWT access tokens paired with rotating HttpOnly refresh token cookies."
+keywords: ["authentication", "jwt", "access token", "refresh token", "cookie", "login", "register"]
+---
+
+Scheduly uses a two-token authentication model:
+
+- **Access token** — a short-lived JWT (15 minutes) that you include in the `Authorization` header of every protected request.
+- **Refresh token** — a longer-lived JWT (7 days) stored in an HttpOnly cookie. The browser or HTTP client sends it automatically on refresh requests; you never handle it directly in JavaScript.
+
+## Auth flow
+
+1. **Register** — create an account with a username, password, and full name.
+2. **Login** — exchange credentials for an access token. The refresh token is set as a cookie automatically.
+3. **Make requests** — include the access token in the `Authorization` header.
+4. **Refresh** — when the access token expires, call `POST /api/auth/refresh`. A new access token and a rotated refresh token are returned.
+5. **Logout** — call `POST /api/auth/logout` to clear the refresh token cookie.
+
+## Authorization header
+
+All protected endpoints require the access token as a Bearer token:
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+Example:
+
+```bash
+curl -X GET http://localhost:3000/api/subjects \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+<Warning>
+  Store access tokens in memory only (e.g. a JavaScript variable or secure in-memory store), not in `localStorage` or `sessionStorage`. Tokens stored in the browser's web storage are accessible to any script on the page and are vulnerable to XSS attacks.
+</Warning>
+
+## Refresh token cookie
+
+The `refreshToken` cookie is set by the server on every successful login and refresh. Its attributes are:
+
+| Attribute | Value |
+|-----------|-------|
+| Name | `refreshToken` |
+| HttpOnly | `true` — not accessible via JavaScript |
+| Secure | `true` in production, `false` in development |
+| SameSite | `strict` |
+| Max-Age | 7 days |
+
+<Note>
+  You do not need to read or attach the refresh token manually. HTTP clients that support cookie jars (browsers, curl with `-c`/`-b` flags, Postman with cookie handling enabled) send it automatically on requests to `/api/auth/refresh`.
+</Note>
+
+## Endpoints
+
+### Register
+
+Create a new user account. Returns the created user without the password field.
+
+**`POST /api/auth/register`**
+
+<CodeGroup>
+```bash curl
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "jhojanRop",
+    "password": "securepass123",
+    "fullName": "Jhojan Ropero"
+  }'
+```
+
+```json response
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "username": "jhojanRop",
+  "fullName": "Jhojan Ropero",
+  "createdAt": "2026-03-15T10:00:00.000Z",
+  "updatedAt": "2026-03-15T10:00:00.000Z"
+}
+```
+</CodeGroup>
+
+**Request body**
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `username` | string | Required. Max 50 characters. Must be unique. |
+| `password` | string | Required. Min 8 characters. |
+| `fullName` | string | Required. Max 100 characters. |
+
+### Login
+
+Authenticate with a username and password. Returns an access token in the response body and sets the `refreshToken` HttpOnly cookie.
+
+**`POST /api/auth/login`**
+
+<CodeGroup>
+```bash curl
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{
+    "username": "jhojanRop",
+    "password": "securepass123"
+  }'
+```
+
+```json response
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMWIyYzNkNC1lNWY2LTc4OTAtYWJjZC1lZjEyMzQ1Njc4OTAiLCJ1c2VybmFtZSI6Impob2phblJvcCIsImlhdCI6MTc0MjAzMjAwMCwiZXhwIjoxNzQyMDMyOTAwfQ.signature"
+}
+```
+</CodeGroup>
+
+**Request body**
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `username` | string | Required. |
+| `password` | string | Required. |
+
+The access token expires after **15 minutes**. Call `/api/auth/refresh` before it expires to get a new one without logging in again.
+
+### Refresh
+
+Exchange a valid refresh token cookie for a new access token and a rotated refresh token cookie. No request body is needed — the server reads the `refreshToken` cookie automatically.
+
+**`POST /api/auth/refresh`**
+
+<CodeGroup>
+```bash curl
+curl -X POST http://localhost:3000/api/auth/refresh \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+```json response
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.newtoken.signature"
+}
+```
+</CodeGroup>
+
+The server validates the incoming refresh token, issues a new access token (15 min), and rotates the refresh token cookie (7 days). If the refresh token is missing or expired, the server responds with `401 Unauthorized`.
+
+<Note>
+  Refresh token rotation means each refresh token can only be used once. After calling `/api/auth/refresh`, the old cookie value is invalid and the new cookie has been set.
+</Note>
+
+### Logout
+
+Clear the refresh token cookie on the server. After this call you will not be able to refresh without logging in again.
+
+**`POST /api/auth/logout`**
+
+<CodeGroup>
+```bash curl
+curl -X POST http://localhost:3000/api/auth/logout \
+  -b cookies.txt \
+  -c cookies.txt
+```
+
+```json response
+{
+  "message": "Logged out successfully"
+}
+```
+</CodeGroup>
+
+Discard the access token on the client side after logging out. Because the access token is a stateless JWT, it remains technically valid until it expires in 15 minutes, but the refresh token will no longer work to extend the session.

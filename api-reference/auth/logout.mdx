@@ -1,0 +1,57 @@
+---
+title: "POST /api/auth/logout"
+description: "Invalidate the current session by clearing the refresh token cookie."
+---
+
+## Overview
+
+Clears the `refreshToken` cookie, effectively ending the user's session. After a successful logout, the browser no longer sends a refresh token, so requests to `/api/auth/refresh` will return `401` until the user logs in again.
+
+<Note>
+  Logging out does not immediately invalidate the short-lived access token. Access tokens expire naturally after 15 minutes. If you need immediate token revocation, implement a server-side token blocklist.
+</Note>
+
+## Request
+
+### HTTP method and path
+
+`POST /api/auth/logout`
+
+### Authentication
+
+None. You do not need to supply an `Authorization` header to call this endpoint.
+
+### Request body
+
+None.
+
+## Response
+
+HTTP `200 OK`
+
+<ResponseField name="message" type="string" required>
+  Confirmation string. Always `"Logged out successfully"`.
+</ResponseField>
+
+## Example
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url https://api.scheduly.app/api/auth/logout \
+  --cookie-jar cookies.txt \
+  --cookie cookies.txt
+```
+
+```json Response
+{
+  "message": "Logged out successfully"
+}
+```
+
+</CodeGroup>
+
+## Error responses
+
+This endpoint always returns `200 OK`. There are no error states — if no cookie is present the server still clears it and returns the success message.

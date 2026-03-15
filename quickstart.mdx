@@ -1,80 +1,254 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Go from zero to a generated academic schedule in under ten minutes."
+keywords: ["quickstart", "getting started", "setup", "install", "schedule", "generate"]
 ---
 
-## Get started in three steps
+This guide walks you through cloning the repository, configuring your environment, and calling the scheduling engine to produce your first optimized schedule.
 
-Get your documentation site running locally and make your first customization.
+**Prerequisites:** Node.js 20.x, PostgreSQL 14 or later, and npm.
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Clone the repo and install dependencies">
+    ```bash
+    git clone https://github.com/JhojanRop/scheduly-api.git
+    cd scheduly-api
+    npm install
+    ```
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Configure your environment">
+    Create a `.env` file in the project root:
 
-### Step 2: Deploy your changes
+    ```bash
+    DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/scheduly_db?schema=public"
+    JWT_SECRET="replace-with-a-long-random-secret"
+    NODE_ENV="development"
+    PORT=3000
+    ```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    Replace `USER` and `PASSWORD` with your PostgreSQL credentials. The database `scheduly_db` will be created by the migration in the next step.
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Set up the database">
+    Run migrations and seed the initial data (day-of-week reference rows):
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    npx prisma migrate dev
+    npx prisma db seed
+    ```
+  </Step>
 
-### Step 3: Go live
+  <Step title="Start the development server">
+    ```bash
+    npm run start:dev
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    The API is now available at `http://localhost:3000/api`. The interactive Swagger UI is at `http://localhost:3000/docs`.
+  </Step>
+
+  <Step title="Register a user">
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/auth/register \
+      -H "Content-Type: application/json" \
+      -d '{
+        "username": "jhojanRop",
+        "password": "securepass123",
+        "fullName": "Jhojan Ropero"
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "username": "jhojanRop",
+      "fullName": "Jhojan Ropero",
+      "createdAt": "2026-03-15T10:00:00.000Z",
+      "updatedAt": "2026-03-15T10:00:00.000Z"
+    }
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Log in and get your access token">
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/auth/login \
+      -H "Content-Type: application/json" \
+      -c cookies.txt \
+      -d '{
+        "username": "jhojanRop",
+        "password": "securepass123"
+      }'
+    ```
+
+    ```json response
+    {
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+    ```
+    </CodeGroup>
+
+    Save the `accessToken` value. You'll pass it as a Bearer token in every subsequent request. The `-c cookies.txt` flag saves the `refreshToken` HttpOnly cookie automatically.
+
+    Set the token as a shell variable for convenience:
+
+    ```bash
+    TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    ```
+  </Step>
+
+  <Step title="Create a subject">
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/subjects \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Algorithms",
+        "code": "CS301"
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "sub-uuid-1111",
+      "name": "Algorithms",
+      "code": "CS301",
+      "createdAt": "2026-03-15T10:01:00.000Z"
+    }
+    ```
+    </CodeGroup>
+
+    Note the subject `id` — you'll need it when generating the schedule.
+  </Step>
+
+  <Step title="Create a professor">
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/professors \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Dr. García"
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "prof-uuid-2222",
+      "name": "Dr. García",
+      "createdAt": "2026-03-15T10:02:00.000Z"
+    }
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create a section">
+    A section represents a specific time slot and day(s) for a subject, taught by a professor.
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/sections \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "subjectId": "sub-uuid-1111",
+        "professorId": "prof-uuid-2222",
+        "startTime": "08:00",
+        "endTime": "10:00",
+        "dayIds": [1, 3]
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "sec-uuid-3333",
+      "subjectId": "sub-uuid-1111",
+      "professorId": "prof-uuid-2222",
+      "startTime": "08:00",
+      "endTime": "10:00",
+      "days": [
+        { "id": 1, "name": "Monday" },
+        { "id": 3, "name": "Wednesday" }
+      ]
+    }
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create a rule">
+    Rules tell the engine what you prefer. Add as many as you like with different priorities.
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/rules \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "type": "NO_EARLY_MORNINGS",
+        "priority": 5
+      }'
+    ```
+
+    ```json response
+    {
+      "id": "rule-uuid-4444",
+      "type": "NO_EARLY_MORNINGS",
+      "priority": 5,
+      "params": null,
+      "createdAt": "2026-03-15T10:04:00.000Z"
+    }
+    ```
+    </CodeGroup>
+
+    <Tip>
+      Higher `priority` values carry more weight in scoring. Use a consistent scale (e.g. 1–10) across all your rules so the relative importance is clear.
+    </Tip>
+  </Step>
+
+  <Step title="Generate your schedule">
+    Pass the IDs of the subjects you want scheduled. The engine returns the top three conflict-free combinations ranked by score.
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:3000/api/scheduling/generate \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "subjectIds": ["sub-uuid-1111"]
+      }'
+    ```
+
+    ```json response
+    [
+      {
+        "score": 42,
+        "sections": [
+          {
+            "id": "sec-uuid-3333",
+            "subjectId": "sub-uuid-1111",
+            "professorId": "prof-uuid-2222",
+            "startTime": "08:00",
+            "endTime": "10:00",
+            "days": [
+              { "id": 1, "name": "Monday" },
+              { "id": 3, "name": "Wednesday" }
+            ]
+          }
+        ]
+      }
+    ]
+    ```
+    </CodeGroup>
+
+    The response is an array of up to three schedule objects, sorted from highest to lowest score. Pick the one you prefer and save it with `POST /api/saved-schedules`.
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+- Read the [Authentication](/authentication) guide to understand token refresh and logout.
+- Explore all 11 rule types in the [Scheduling engine](/concepts/scheduling-engine) concept page.
+- Browse the full [API reference](/api-reference) for complete request and response schemas.
